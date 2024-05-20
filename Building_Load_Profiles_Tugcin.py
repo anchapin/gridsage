@@ -1,26 +1,25 @@
 import numpy as np
 import pandas as pd
 
-# Example data extracted from the image (manual entry for demonstration)
-building_data = [
-    {'Project Name': '380 Stuart', 'Annual Electric (kWh)': 6543689, 'Peak Electric (kW)': 2742},
-    {'Project Name': '22 Drydock', 'Annual Electric (kWh)': 9598306, 'Peak Electric (kW)': 2543},
-    {'Project Name': 'Rockwood Manor', 'Annual Electric (kWh)': 482051, 'Peak Electric (kW)': 6.5},
-    {'Project Name': '175 N. Harvard Street - Housing', 'Annual Electric (kWh)': 1463392, 'Peak Electric (kW)': 234},
-    {'Project Name': '1208C VFW Parkway Residences', 'Annual Electric (kWh)': 587850, 'Peak Electric (kW)': 37},
-    {'Project Name': '18-22 Arboretum', 'Annual Electric (kWh)': 1537054, 'Peak Electric (kW)': 812.4},
-    {'Project Name': 'Cheney St Apartments (4-18 Cheney)', 'Annual Electric (kWh)': 237220, 'Peak Electric (kW)': 250},
-    {'Project Name': '175 N. Harvard St - Affiliate Housing', 'Annual Electric (kWh)': 1463392, 'Peak Electric (kW)': 234}
-]
+# Load the new building data file
+boston_building_data_path = '../Boston_Load_profile_Example.csv'
+boston_building_data = pd.read_csv(boston_building_data_path)
 
-# Load the COMStock dataset for reference pattern
-comstock_pattern_path = 'COMStock_large_office_15_minute_timeseries_data_Tugcin.csv'
-new_timeseries_data = pd.read_csv(comstock_pattern_path, delimiter=';')
-comstock_pattern = new_timeseries_data[['Timestamp (EST)', 'upgrade.out.electricity.total.energy_consumption.kwh']].copy()
-comstock_pattern.set_index('Timestamp (EST)', inplace=True)
+# Load the COMStock profiles
+comstock_hotel_path = '../COMStock_hotel_15_minute_timeseries_data_Tugcin.csv'
+comstock_large_office_path = '../COMStock_large_office_15_minute_timeseries_data_Tugcin.csv'
 
-# Normalize the COMStock pattern to generate a load profile
-comstock_pattern['Normalized Load'] = comstock_pattern['upgrade.out.electricity.total.energy_consumption.kwh'] / comstock_pattern['upgrade.out.electricity.total.energy_consumption.kwh'].max()
+comstock_hotel = pd.read_csv(comstock_hotel_path, delimiter=';')
+comstock_large_office = pd.read_csv(comstock_large_office_path, delimiter=';')
+
+# Normalize the COMStock patterns
+comstock_hotel['Timestamp'] = pd.to_datetime(comstock_hotel['Timestamp (EST)'])
+comstock_hotel.set_index('Timestamp', inplace=True)
+comstock_hotel['Normalized Load'] = comstock_hotel['upgrade.out.electricity.total.energy_consumption.kwh'] / comstock_hotel['upgrade.out.electricity.total.energy_consumption.kwh'].max()
+
+comstock_large_office['Timestamp'] = pd.to_datetime(comstock_large_office['Timestamp (EST)'])
+comstock_large_office.set_index('Timestamp', inplace=True)
+comstock_large_office['Normalized Load'] = comstock_large_office['upgrade.out.electricity.total.energy_consumption.kwh'] / comstock_large_office['upgrade.out.electricity.total.energy_consumption.kwh'].max()
 
 # Function to generate load profile for a building
 def generate_load_profile(building, comstock_pattern):
@@ -35,21 +34,34 @@ def generate_load_profile(building, comstock_pattern):
     scaling_factor = annual_kwh / total_annual_kwh
     load_profile *= scaling_factor
     
+    # Resample the load profile to hourly resolution
+    load_profile_hourly = load_profile.resample('H').mean()
+    
     # Create a DataFrame for the load profile
     profile_df = pd.DataFrame({
-        'Timestamp': comstock_pattern.index,
-        'Power Demand (kW)': load_profile
+        'Timestamp': load_profile_hourly.index,
+        'Power Demand (kW)': load_profile_hourly.values
     })
     
     return profile_df
 
-# Generate and save load profiles for each building
-output_files = []
-for building in building_data:
+# Generate load profiles for all buildings
+all_profiles = {}
+for _, building in boston_building_data.iterrows():
+    if building['Building Type'] == 'Residential':
+        comstock_pattern = comstock_hotel
+    else:
+        comstock_pattern = comstock_large_office
+    
     profile_df = generate_load_profile(building, comstock_pattern)
-    output_file_path = f'{building["Project Name"].replace(" ", "_")}_Load_Profile.csv'
-    profile_df.to_csv(output_file_path, index=False)
-    output_files.append(output_file_path)
-    print(f'Saved load profile for {building["Project Name"]} to {output_file_path}')
+    all_profiles[building['Project Name']] = profile_df
 
-output_files
+# Example: Access and print the profile for '380 Stuart'
+profile_380_stuart = all_profiles['380 Stuart']
+print(profile_380_stuart.head())
+
+# Save profiles to CSV files
+for project_name, profile_df in all_profiles.items():
+    file_path = f"{project_name.replace(' ', '_')}_Load_Profile.csv"
+    profile_df.to_csv(file_path, index=False)
+    print(f"Saved load profile for {project_name} to {file_path}")
