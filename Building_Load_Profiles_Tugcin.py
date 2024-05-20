@@ -2,12 +2,12 @@ import numpy as np
 import pandas as pd
 
 # Load the new building data file
-boston_building_data_path = '../Boston_Load_profile_Example.csv'
-boston_building_data = pd.read_csv(boston_building_data_path)
+boston_building_data_path = 'Boston_Load_profile_Example.csv'
+boston_building_data = pd.read_csv(boston_building_data_path, delimiter=';')
 
 # Load the COMStock profiles
-comstock_hotel_path = '../COMStock_hotel_15_minute_timeseries_data_Tugcin.csv'
-comstock_large_office_path = '../COMStock_large_office_15_minute_timeseries_data_Tugcin.csv'
+comstock_hotel_path = 'COMStock_hotel_15_minute_timeseries_data_Tugcin.csv'
+comstock_large_office_path = 'COMStock_large_office_15_minute_timeseries_data_Tugcin.csv'
 
 comstock_hotel = pd.read_csv(comstock_hotel_path, delimiter=';')
 comstock_large_office = pd.read_csv(comstock_large_office_path, delimiter=';')
@@ -55,10 +55,6 @@ for _, building in boston_building_data.iterrows():
     
     profile_df = generate_load_profile(building, comstock_pattern)
     all_profiles[building['Project Name']] = profile_df
-
-# Example: Access and print the profile for '380 Stuart'
-profile_380_stuart = all_profiles['380 Stuart']
-print(profile_380_stuart.head())
 
 # Save profiles to CSV files
 for project_name, profile_df in all_profiles.items():
